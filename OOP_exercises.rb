@@ -93,19 +93,23 @@ class Student
   attr_writer :grade
 
   def initialize(name, grade)
-    self.name = name
-    self.grade = grade    
+    @name = name
+    @grade = grade    
   end
 
   def better_grade_than?(student)
-    self.grade > student.grade ? true : false
+    grade > student.grade ? true : false
   end
 
-  private
+  protected
   attr_reader :grade
+
 end
 
 jason = Student.new("Jason", 90)
 bob = Student.new("Bob", 89)
-puts "Well done!" if jason.better_grade_than(bob)
+puts jason.name
+puts bob.name
+puts "Well done!" if jason.better_grade_than?(bob)
+# 8. the hi method is a private method, in order to change it, put it above the private calling
 # --- END: OOP Inheritance ---
