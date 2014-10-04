@@ -1,0 +1,19 @@
+# Live session 10/4/14 Notes
+
+Topic: Meta-programming
+- Code that creates other code
+
+Topic: Continuation (Closures)
+- Example
+
+def takes_block
+  yield
+end
+
+takes_block do
+  puts "hi"
+end
+
+- puts "hi" is executed at like 9, not 13
+
+- Lambdas
