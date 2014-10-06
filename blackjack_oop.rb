@@ -10,22 +10,25 @@ class Card
   end
 
   def to_s
-    "=> #{value} of #{suit}s"
+    "=> #{value} of #{suit}"
   end
 
   def drawn
-    "=> #{value} of #{suit}s *"
+    "=> #{value} of #{suit} *"
   end
 end
 
 class Deck
+  SUITS = ["Hearts","Diamonds","Spades","Clubs"]
+  VALUES = ["Ace",2,3,4,5,6,7,8,9,10,"Jack","Queen","King"]
+
   attr_accessor :cards
 
   def initialize(n)
     @cards = []
     n.times do
-      ["Heart","Diamond","Spade","Club"].each do |suit|
-        ["Ace",2,3,4,5,6,7,8,9,10,"Jack","Queen","King"].each do |face_value|
+      SUITS.each do |suit|
+        VALUES.each do |face_value|
           @cards << Card.new(suit,face_value)
         end
       end
@@ -57,7 +60,7 @@ class Hand
   def show
     puts "#{name}'s Hand:"
     cards.each do |card|
-      if cards.index(card) == (cards.length - 1) && cards.length != 2
+      if card == cards.last && cards.length != 2
         puts card.drawn
       else
         puts card.to_s
@@ -79,7 +82,7 @@ class Hand
   def show_first
     puts "#{name}'s Hand:"
     puts cards[0]
-    puts "???"
+    puts "=> ???"
     puts "Card Total: ???"
     puts
   end
@@ -107,15 +110,14 @@ class Player
   attr_accessor :name, :hand
 
   def get_choice
-    acceptable = ['h', 'hit', 's', 'stay', 'sur','surrender','sp', 'split', 'dd', 'double down']
-    begin
-      puts "Hit(h) or Stay(s)?"
-      choice = gets.chomp.downcase
-    end until acceptable.include?(choice)
+    puts "Hit(h) or Stand(s)?"
+    choice = gets.chomp.downcase
     if choice == 'h' || choice == 'hit'
       "hit"
-    elsif choice == 's' || choice == 'stay'
-      "stay"    
+    elsif choice == 's' || choice == 'stand'
+      "stand"    
+    else
+      "loop"
     end
   end
 
@@ -129,33 +131,80 @@ class Player
 end
 
 class Human < Player
-  attr_accessor :bank, :bet_amount
+  attr_accessor :bank, :bet_amount, :winnings, :total_winnings 
 
   def initialize
     puts "What is your name?"
     @name = gets.chomp
     @hand = Hand.new(self)
-    puts
-    puts "How much are you buying in? ($)"
-    @bank = gets.chomp.to_i
+    @bank = 0
     @bet_amount = 0
+    @winnings = 0
+    @total_winnings = 0
+  end
+
+  def display_buyin_process
+    system 'clear'
+    puts "Welcome #{name}!"
+    puts
+    puts "How much are you buying in? ($#{Game::MIN_BET} minimum buy-in)"
+    @bank = gets.chomp.to_i
+    puts "Buy-in is too low, try again..." if @bank < Game::MIN_BET && @bank != 0
+    puts "Invalid buy-in amount, try again..." if @bank == 0
+    sleep(1)
+  end
+
+  def buy_in
+    begin
+      display_buyin_process
+    end until @bank >= Game::MIN_BET
+  end
+
+  def display_bet_process
+    system 'clear'
+    puts "Let's start the betting process..."
+    puts 
+    puts "#{name}'s Bank: $#{bank}"
+    puts
+    puts "How much would you like to bet? (Min: $#{Game::MIN_BET}, Max: $#{Game::MAX_BET})"
+    @bet_amount = gets.chomp.to_i
+    if (bank - @bet_amount) < 0
+      puts "Insufficent funds!"
+      sleep(1.5)
+    elsif @bet_amount > 100
+      puts "Bet is too high, try again..."
+      sleep(1.5)
+    elsif @bet_amount < 5 && @bet_amount != 0
+      puts "Bet is too low, try again..."
+      sleep(1.5)
+    elsif @bet_amount == 0
+      puts "Invalid bet amount, try again..."
+      sleep(1.5)
+    else
+      sleep(1)
+    end
   end
 
   def bet
-    puts "Let's start the betting process..."
     begin
-      puts 
-      puts "#{name}'s Bank: $#{bank}"
-      puts
-      puts "How much would you like to bet? (Min: 5, Max: 100)"
-      @bet_amount = gets.chomp.to_i
-      puts "Bet is too high" if @bet_amount > 100
-      puts "Bet is too low" if @bet_amount < 5 && @bet_amount != 0
-      puts "Invalid Bet amount, try again..." if @bet_amount == 0
-      puts "Insufficent funds!" if (bank - @bet_amount) < 0
-    end until @bet_amount >= 5 && @bet_amount <= 100 && (bank - @bet_amount) >= 0
-    @bank -= @bet_amount if (bank - @bet_amount) >= 0
-    system 'clear'
+      display_bet_process
+    end until @bet_amount >= 5 && @bet_amount <= 100 && (bank-@bet_amount) >= 0
+    @bank -= @bet_amount if (bank-@bet_amount) >= 0
+  end
+
+  def bet_error
+    puts "#{name}'s Bank: $#{bank}"
+    puts 
+    puts "Insufficent funds! You don't have enough to bet!"
+    puts
+    puts "Buy-in(b) or Quit(q):"
+    choice = gets.chomp.downcase
+    if choice == 'b' || choice == 'buy' || choice == 'buy-in' || choice == 'buyin'
+      buy_in
+      bet
+    else
+      exit
+    end
   end
 
   def show_bet
@@ -167,10 +216,22 @@ class Human < Player
     puts "#{name}'s Bank: $#{bank}"
   end
 
-  def collect(amount)
-    @bank += amount
+  def collect(result="bet")
+    case result
+    when "bet"
+      @winnings = bet_amount
+      @bank += winnings
+      @total_winnings += @winnings
+    when "blackjack"
+      @winnings = (bet_amount * 3).to_i
+      @bank += winnings
+      @total_winnings += @winnings
+    when "win"
+      @winnings = (bet_amount * 2)
+      @bank += winnings
+      @total_winnings += @winnings
+    end
   end
-
 end
 
 class Dealer < Player
@@ -190,6 +251,11 @@ class Dealer < Player
 end
 
 class Game
+  MIN_BET = 5
+  MAX_BET = MIN_BET * 20
+
+  @@rounds = 0
+
   attr_reader :player, :dealer, :deck
 
   def initialize
@@ -199,6 +265,7 @@ class Game
     @deck = Deck.new(1)
     @player = Human.new
     @dealer = Dealer.new
+    player.buy_in
   end
 
   def initial_deal
@@ -208,7 +275,7 @@ class Game
     end
   end
 
-  def display(sequence)
+  def display_info_at(sequence)
     system 'clear'
     case sequence
     when "init_player"
@@ -236,22 +303,25 @@ class Game
       if choice == "hit"
         system 'clear'
         player.hand.cards << deck.deal
-        display("init_player")
+        display_info_at("init_player")
+      elsif choice == "loop"
+        system 'clear'
+        display_info_at("init_player")
       end
-    end until choice == "stay" || player.blackjack? || player.bust?
+    end until choice == "stand" || player.blackjack? || player.bust?
   end
 
   def dealer_turn
-    display("init_dealer")
+    display_info_at("init_dealer")
     puts "Dealer flips card..."
-    gets
-    display("post_flip")
+    sleep(1)
+    display_info_at("post_flip")
     unless dealer.reach_17? || dealer.blackjack? || dealer.bust?
       begin
         puts "Dealer hits..."
-        gets
+        sleep(1)
         dealer.hand.cards << deck.deal
-        display("post_flip")
+        display_info_at("post_flip")
       end until dealer.reach_17? || dealer.blackjack? || dealer.bust?
     end
   end
@@ -270,25 +340,25 @@ class Game
 
   def result
     if player.blackjack?
-      player.bank += (player.bet_amount * 2.5).to_i
-      "Blackjack! #{player.name} won $#{((player.bet_amount*2.5).to_i)}!"
+      player.collect("blackjack")
+      "Blackjack! #{player.name} won $#{player.winnings}!"
     elsif player.bust?
       "Bust! #{player.name} loses $#{player.bet_amount}!"
     elsif dealer.blackjack?
       "Dealer Blackjack! #{player.name} loses $#{player.bet_amount}!"
     elsif dealer.bust?
-      player.bank += (player.bet_amount * 2)
-      "Dealer Bust! #{player.name} won $#{(player.bet_amount*2)}!"
+      player.collect("win")
+      "Dealer Bust! #{player.name} won $#{player.winnings}!"
     else
       case compare_hands
       when "tie"
-        player.bank += player.bet_amount
+        player.collect
         "It's a tie! You get your bet of $#{player.bet_amount} back!"
       when "#{player.name}"
-        player.bank += (player.bet_amount * 2)
-        "#{player.name} has the larger hand, winning $#{(player.bet_amount*2)}!"
+        player.collect("win")
+        "#{player.name} has the larger hand, winning $#{player.winnings}!"
       when "#{dealer.name}"
-        "#{dealer.name} has the larger hand, you lose $#{player.bet_amount}!"         
+        "#{dealer.name} has the larger hand, you lose $#{player.bet_amount}!"
       end
     end 
   end
@@ -296,11 +366,11 @@ class Game
   def announce_result
     system 'clear'
     if player.bust? || player.blackjack?
-      display("init_player")
+      display_info_at("init_player")
     elsif dealer.bust? || dealer.blackjack?
-      display("post_flip")
+      display_info_at("post_flip")
     else
-      display("end_game")
+      display_info_at("end_game")
     end
     puts result
     puts
@@ -309,6 +379,7 @@ class Game
 
   def play_again?
     puts
+    puts "Rounds played: #{@@rounds}"
     puts "Play again? (y/n)"
     exit unless gets.chomp.downcase == 'y'
     reset
@@ -323,9 +394,10 @@ class Game
 
   def run
     system 'clear'
-    player.bet
+    @@rounds += 1
+    player.bank >= MIN_BET ? player.bet : player.bet_error
     initial_deal
-    display("init_player")
+    display_info_at("init_player")
     unless player.blackjack? || player.bust?
       player_turn
       dealer_turn unless player.blackjack? || player.bust?
