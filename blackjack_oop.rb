@@ -188,7 +188,7 @@ class Human < Player
   def bet
     begin
       display_bet_process
-    end until @bet_amount >= 5 && @bet_amount <= 100 && (bank-@bet_amount) >= 0
+    end until @bet_amount >= Game::MIN_BET && @bet_amount <= Game::MAX_BET && (bank-@bet_amount) >= 0
     @bank -= @bet_amount if (bank-@bet_amount) >= 0
   end
 
